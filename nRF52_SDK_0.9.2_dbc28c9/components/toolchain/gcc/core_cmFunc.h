@@ -198,7 +198,7 @@ __STATIC_INLINE void __set_PRIMASK(uint32_t priMask)
 }
 
 
-#if       (__CORTEX_M >= 0x03) || (__CORTEX_SC >= 300)
+#if       (__CORTEX_M >= 0x03) && (__CORTEX_SC >= 300)
 
 /** \brief  Enable FIQ
 
