@@ -3,9 +3,13 @@
 *       Solutions for real time microcontroller applications         *
 **********************************************************************
 *                                                                    *
-*       (c) 2014 - 2015  SEGGER Microcontroller GmbH & Co. KG        *
+*       (c) 2015 - 2016  SEGGER Microcontroller GmbH & Co. KG        *
 *                                                                    *
 *       www.segger.com     Support: support@segger.com               *
+*                                                                    *
+**********************************************************************
+*                                                                    *
+*       SEGGER SystemView * Real-time application analysis           *
 *                                                                    *
 **********************************************************************
 *                                                                    *
@@ -18,22 +22,23 @@
 *   the following disclaimer.                                        *
 * * Modified versions of this software in source or linkable form    *
 *   may not be distributed without prior consent of SEGGER.          *
-* * This software may only be used for communication with SEGGER     *
-*   J-Link debug probes.                                             *
 *                                                                    *
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND             *
-* CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,        *
-* INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF           *
-* MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE           *
-* DISCLAIMED. IN NO EVENT SHALL SEGGER Microcontroller BE LIABLE FOR *
-* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR           *
-* CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT  *
-* OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;    *
-* OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF      *
-* LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT          *
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE  *
-* USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH   *
-* DAMAGE.                                                            *
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS "AS IS" AND     *
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,  *
+* THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A        *
+* PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL               *
+* SEGGER Microcontroller BE LIABLE FOR ANY DIRECT, INDIRECT,         *
+* INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES           *
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS    *
+* OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS            *
+* INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,       *
+* WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING          *
+* NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS *
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.       *
+*                                                                    *
+**********************************************************************
+*                                                                    *
+*       SystemView version: V2.30                                    *
 *                                                                    *
 **********************************************************************
 ---------------------------END-OF-HEADER------------------------------
@@ -85,11 +90,11 @@ Additional information:
 #endif
 
 #ifndef   SEGGER_RTT_LOCK
-  #define SEGGER_RTT_LOCK(SavedState)
+  #define SEGGER_RTT_LOCK()
 #endif
 
 #ifndef   SEGGER_RTT_UNLOCK
-  #define SEGGER_RTT_UNLOCK(SavedState)
+  #define SEGGER_RTT_UNLOCK()
 #endif
 
 #ifndef   STRLEN
@@ -215,7 +220,7 @@ static void _DoInit(void) {
 *  Return value
 *    >= 0 - Number of bytes written into buffer.
 */
-static unsigned _WriteBlocking(SEGGER_RTT_RING_BUFFER *pRing, const char* pBuffer, unsigned NumBytes) {
+static unsigned _WriteBlocking(SEGGER_RTT_BUFFER_UP* pRing, const char* pBuffer, unsigned NumBytes) {
   unsigned NumBytesToWrite;
   unsigned NumBytesWritten;
   unsigned RdOff;
@@ -266,7 +271,7 @@ static unsigned _WriteBlocking(SEGGER_RTT_RING_BUFFER *pRing, const char* pBuffe
 *  Notes
 *    (1) If there might not be enough space in the "Up"-buffer, call _WriteBlocking
 */
-static void _WriteNoCheck(SEGGER_RTT_RING_BUFFER *pRing, const char* pData, unsigned NumBytes) {
+static void _WriteNoCheck(SEGGER_RTT_BUFFER_UP* pRing, const char* pData, unsigned NumBytes) {
   unsigned NumBytesAtOnce;
   unsigned WrOff;
   unsigned Rem;
@@ -304,11 +309,11 @@ static void _WriteNoCheck(SEGGER_RTT_RING_BUFFER *pRing, const char* pData, unsi
 *    pRing        Ring buffer to post to.
 *    TerminalId   Terminal ID to switch to.
 */
-static void _PostTerminalSwitch(SEGGER_RTT_RING_BUFFER *pRing, char TerminalId) {
+static void _PostTerminalSwitch(SEGGER_RTT_BUFFER_UP* pRing, unsigned char TerminalId) {
   char ac[2];
 
   ac[0] = 0xFFu;
-  ac[1] = _aTerminalId[(unsigned char)TerminalId];  // Caller made already sure that TerminalId does not exceed our terminal limit
+  ac[1] = _aTerminalId[TerminalId];  // Caller made already sure that TerminalId does not exceed our terminal limit
   _WriteBlocking(pRing, ac, 2u);
 }
 
@@ -326,7 +331,7 @@ static void _PostTerminalSwitch(SEGGER_RTT_RING_BUFFER *pRing, char TerminalId) 
 *  Return value
 *    Number of bytes that are free in the buffer.
 */
-static unsigned _GetAvailWriteSpace(SEGGER_RTT_RING_BUFFER *pRing) {
+static unsigned _GetAvailWriteSpace(SEGGER_RTT_BUFFER_UP* pRing) {
   unsigned RdOff;
   unsigned WrOff;
   unsigned r;
@@ -368,12 +373,12 @@ static unsigned _GetAvailWriteSpace(SEGGER_RTT_RING_BUFFER *pRing) {
 *    Number of bytes that have been read.
 */
 unsigned SEGGER_RTT_ReadNoLock(unsigned BufferIndex, void* pData, unsigned BufferSize) {
-  unsigned NumBytesRem;
-  unsigned NumBytesRead;
-  unsigned RdOff;
-  unsigned WrOff;
-  unsigned char* pBuffer;
-  SEGGER_RTT_RING_BUFFER* pRing;
+  unsigned                NumBytesRem;
+  unsigned                NumBytesRead;
+  unsigned                RdOff;
+  unsigned                WrOff;
+  unsigned char*          pBuffer;
+  SEGGER_RTT_BUFFER_DOWN* pRing;
   //
   INIT();
   pRing = &_SEGGER_RTT.aDown[BufferIndex];
@@ -436,9 +441,8 @@ unsigned SEGGER_RTT_ReadNoLock(unsigned BufferIndex, void* pData, unsigned Buffe
 */
 unsigned SEGGER_RTT_Read(unsigned BufferIndex, void* pBuffer, unsigned BufferSize) {
   unsigned NumBytesRead;
-  volatile unsigned SavedState;
   //
-  SEGGER_RTT_LOCK(SavedState);
+  SEGGER_RTT_LOCK();
   //
   // Call the non-locking read function
   //
@@ -446,7 +450,7 @@ unsigned SEGGER_RTT_Read(unsigned BufferIndex, void* pBuffer, unsigned BufferSiz
   //
   // Finish up.
   //
-  SEGGER_RTT_UNLOCK(SavedState);
+  SEGGER_RTT_UNLOCK();
   //
   return NumBytesRead;
 }
@@ -476,12 +480,12 @@ unsigned SEGGER_RTT_Read(unsigned BufferIndex, void* pBuffer, unsigned BufferSiz
 *        Either by calling SEGGER_RTT_Init() or calling another RTT API function first.
 */
 unsigned SEGGER_RTT_WriteSkipNoLock(unsigned BufferIndex, const void* pBuffer, unsigned NumBytes) {
-  const char*  pData;
-  SEGGER_RTT_RING_BUFFER* pRing;
-  unsigned     Avail;
-  unsigned     RdOff;
-  unsigned     WrOff;
-  unsigned     Rem;
+  const char*           pData;
+  SEGGER_RTT_BUFFER_UP* pRing;
+  unsigned              Avail;
+  unsigned              RdOff;
+  unsigned              WrOff;
+  unsigned              Rem;
 
   pData = (const char *)pBuffer;
   //
@@ -509,8 +513,18 @@ unsigned SEGGER_RTT_WriteSkipNoLock(unsigned BufferIndex, const void* pBuffer, u
     //
     Avail = pRing->SizeOfBuffer - 1u - WrOff ;
     if (Avail >= NumBytes) {
+#if 1 // memcpy() is good for large amounts of data, but the overhead is too big for small amounts. Use a simple byte loop instead.
+      char* pDst;
+      pDst = pRing->pBuffer + WrOff;
+      WrOff += NumBytes;
+      do {
+        *pDst++ = *pData++;
+      } while (--NumBytes);
+      pRing->WrOff = WrOff + NumBytes;
+#else
       memcpy(pRing->pBuffer + WrOff, pData, NumBytes);
       pRing->WrOff = WrOff + NumBytes;
+#endif
       return 1;
     }
     //
@@ -576,11 +590,11 @@ unsigned SEGGER_RTT_WriteSkipNoLock(unsigned BufferIndex, const void* pBuffer, u
 *        Either by calling SEGGER_RTT_Init() or calling another RTT API function first.
 */
 unsigned SEGGER_RTT_WriteNoLock(unsigned BufferIndex, const void* pBuffer, unsigned NumBytes) {
-  unsigned Status;
-  unsigned Avail;
-  const char*  pData;
-  SEGGER_RTT_RING_BUFFER *pRing;
-  
+  unsigned              Status;
+  unsigned              Avail;
+  const char*           pData;
+  SEGGER_RTT_BUFFER_UP* pRing;
+
   pData = (const char *)pBuffer;
   //
   // Get "to-host" ring buffer.
@@ -648,10 +662,9 @@ unsigned SEGGER_RTT_WriteNoLock(unsigned BufferIndex, const void* pBuffer, unsig
 */
 unsigned SEGGER_RTT_Write(unsigned BufferIndex, const void* pBuffer, unsigned NumBytes) {
   unsigned Status;
-  volatile unsigned SavedState;
   //
   INIT();
-  SEGGER_RTT_LOCK(SavedState);
+  SEGGER_RTT_LOCK();
   //
   // Call the non-locking write function
   //
@@ -659,7 +672,7 @@ unsigned SEGGER_RTT_Write(unsigned BufferIndex, const void* pBuffer, unsigned Nu
   //
   // Finish up.
   //
-  SEGGER_RTT_UNLOCK(SavedState);
+  SEGGER_RTT_UNLOCK();
   //
   return Status;
 }
@@ -785,14 +798,103 @@ int SEGGER_RTT_HasKey(void) {
 *
 */
 unsigned SEGGER_RTT_HasData(unsigned BufferIndex) {
-  SEGGER_RTT_RING_BUFFER *pRing;
-  unsigned v;
+  SEGGER_RTT_BUFFER_DOWN* pRing;
+  unsigned                v;
 
   pRing = &_SEGGER_RTT.aDown[BufferIndex];
   v = pRing->WrOff;
   return v - pRing->RdOff;
 }
 
+/*********************************************************************
+*
+*       SEGGER_RTT_AllocDownBuffer
+*
+*  Function description
+*    Run-time configuration of the next down-buffer (H->T).
+*    The next buffer, which is not used yet is configured.
+*    This includes: Buffer address, size, name, flags, ...
+*
+*  Parameters
+*    sName        Pointer to a constant name string.
+*    pBuffer      Pointer to a buffer to be used.
+*    BufferSize   Size of the buffer.
+*    Flags        Operating modes. Define behavior if buffer is full (not enough space for entire message).
+*
+*  Return value
+*    >= 0 - O.K. Buffer Index
+*     < 0 - Error
+*/
+int SEGGER_RTT_AllocDownBuffer(const char* sName, void* pBuffer, unsigned BufferSize, unsigned Flags) {
+  int BufferIndex;
+
+  INIT();
+  SEGGER_RTT_LOCK();
+  BufferIndex = 0;
+  do {
+    if (_SEGGER_RTT.aDown[BufferIndex].pBuffer == NULL) {
+      break;
+    }
+    BufferIndex++;
+  } while (BufferIndex < _SEGGER_RTT.MaxNumDownBuffers);
+  if (BufferIndex < _SEGGER_RTT.MaxNumDownBuffers) {
+    _SEGGER_RTT.aDown[BufferIndex].sName        = sName;
+    _SEGGER_RTT.aDown[BufferIndex].pBuffer      = pBuffer;
+    _SEGGER_RTT.aDown[BufferIndex].SizeOfBuffer = BufferSize;
+    _SEGGER_RTT.aDown[BufferIndex].RdOff        = 0u;
+    _SEGGER_RTT.aDown[BufferIndex].WrOff        = 0u;
+    _SEGGER_RTT.aDown[BufferIndex].Flags        = Flags;
+  } else {
+    BufferIndex = -1;
+  }
+  SEGGER_RTT_UNLOCK();
+  return BufferIndex;
+}
+
+/*********************************************************************
+*
+*       SEGGER_RTT_AllocUpBuffer
+*
+*  Function description
+*    Run-time configuration of the next up-buffer (T->H).
+*    The next buffer, which is not used yet is configured.
+*    This includes: Buffer address, size, name, flags, ...
+*
+*  Parameters
+*    sName        Pointer to a constant name string.
+*    pBuffer      Pointer to a buffer to be used.
+*    BufferSize   Size of the buffer.
+*    Flags        Operating modes. Define behavior if buffer is full (not enough space for entire message).
+*
+*  Return value
+*    >= 0 - O.K. Buffer Index
+*     < 0 - Error
+*/
+int SEGGER_RTT_AllocUpBuffer(const char* sName, void* pBuffer, unsigned BufferSize, unsigned Flags) {
+  int BufferIndex;
+
+  INIT();
+  SEGGER_RTT_LOCK();
+  BufferIndex = 0;
+  do {
+    if (_SEGGER_RTT.aUp[BufferIndex].pBuffer == NULL) {
+      break;
+    }
+    BufferIndex++;
+  } while (BufferIndex < _SEGGER_RTT.MaxNumUpBuffers);
+  if (BufferIndex < _SEGGER_RTT.MaxNumUpBuffers) {
+    _SEGGER_RTT.aUp[BufferIndex].sName        = sName;
+    _SEGGER_RTT.aUp[BufferIndex].pBuffer      = pBuffer;
+    _SEGGER_RTT.aUp[BufferIndex].SizeOfBuffer = BufferSize;
+    _SEGGER_RTT.aUp[BufferIndex].RdOff        = 0u;
+    _SEGGER_RTT.aUp[BufferIndex].WrOff        = 0u;
+    _SEGGER_RTT.aUp[BufferIndex].Flags        = Flags;
+  } else {
+    BufferIndex = -1;
+  }
+  SEGGER_RTT_UNLOCK();
+  return BufferIndex;
+}
 
 /*********************************************************************
 *
@@ -816,11 +918,10 @@ unsigned SEGGER_RTT_HasData(unsigned BufferIndex) {
 */
 int SEGGER_RTT_ConfigUpBuffer(unsigned BufferIndex, const char* sName, void* pBuffer, unsigned BufferSize, unsigned Flags) {
   int r;
-  volatile unsigned SavedState;
 
   INIT();
   if (BufferIndex < (unsigned)_SEGGER_RTT.MaxNumUpBuffers) {
-    SEGGER_RTT_LOCK(SavedState);
+    SEGGER_RTT_LOCK();
     if (BufferIndex > 0u) {
       _SEGGER_RTT.aUp[BufferIndex].sName        = sName;
       _SEGGER_RTT.aUp[BufferIndex].pBuffer      = pBuffer;
@@ -829,7 +930,7 @@ int SEGGER_RTT_ConfigUpBuffer(unsigned BufferIndex, const char* sName, void* pBu
       _SEGGER_RTT.aUp[BufferIndex].WrOff        = 0u;
     }
     _SEGGER_RTT.aUp[BufferIndex].Flags          = Flags;
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
     r =  0;
   } else {
     r = -1;
@@ -859,11 +960,10 @@ int SEGGER_RTT_ConfigUpBuffer(unsigned BufferIndex, const char* sName, void* pBu
 */
 int SEGGER_RTT_ConfigDownBuffer(unsigned BufferIndex, const char* sName, void* pBuffer, unsigned BufferSize, unsigned Flags) {
   int r;
-  volatile unsigned SavedState;
 
   INIT();
   if (BufferIndex < (unsigned)_SEGGER_RTT.MaxNumDownBuffers) {
-    SEGGER_RTT_LOCK(SavedState);
+    SEGGER_RTT_LOCK();
     if (BufferIndex > 0u) {
       _SEGGER_RTT.aDown[BufferIndex].sName        = sName;
       _SEGGER_RTT.aDown[BufferIndex].pBuffer      = pBuffer;
@@ -872,7 +972,7 @@ int SEGGER_RTT_ConfigDownBuffer(unsigned BufferIndex, const char* sName, void* p
       _SEGGER_RTT.aDown[BufferIndex].WrOff        = 0u;
     }
     _SEGGER_RTT.aDown[BufferIndex].Flags          = Flags;
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
     r =  0;
   } else {
     r = -1;
@@ -898,13 +998,12 @@ int SEGGER_RTT_ConfigDownBuffer(unsigned BufferIndex, const char* sName, void* p
 */
 int SEGGER_RTT_SetNameUpBuffer(unsigned BufferIndex, const char* sName) {
   int r;
-  volatile unsigned SavedState;
 
   INIT();
   if (BufferIndex < (unsigned)_SEGGER_RTT.MaxNumUpBuffers) {
-    SEGGER_RTT_LOCK(SavedState);
+    SEGGER_RTT_LOCK();
     _SEGGER_RTT.aUp[BufferIndex].sName = sName;
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
     r =  0;
   } else {
     r = -1;
@@ -930,13 +1029,12 @@ int SEGGER_RTT_SetNameUpBuffer(unsigned BufferIndex, const char* sName) {
 */
 int SEGGER_RTT_SetNameDownBuffer(unsigned BufferIndex, const char* sName) {
   int r;
-  volatile unsigned SavedState;
 
   INIT();
   if (BufferIndex < (unsigned)_SEGGER_RTT.MaxNumDownBuffers) {
-    SEGGER_RTT_LOCK(SavedState);
+    SEGGER_RTT_LOCK();
     _SEGGER_RTT.aDown[BufferIndex].sName = sName;
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
     r =  0;
   } else {
     r = -1;
@@ -972,9 +1070,8 @@ void SEGGER_RTT_Init (void) {
 *     < 0  Error (e.g. if RTT is configured for non-blocking mode and there was no space in the buffer to set the new terminal Id)
 */
 int SEGGER_RTT_SetTerminal (char TerminalId) {
-  char ac[2];
-  SEGGER_RTT_RING_BUFFER *pRing;
-  volatile unsigned SavedState;
+  char                  ac[2];
+  SEGGER_RTT_BUFFER_UP* pRing;
   unsigned Avail;
   int r;
   //
@@ -982,10 +1079,10 @@ int SEGGER_RTT_SetTerminal (char TerminalId) {
   //
   r = 0;
   ac[0] = 0xFFU;
-  if (TerminalId < (char)sizeof(_aTerminalId)) { // We only support a certain number of channels
+  if ((unsigned char)TerminalId < (unsigned char)sizeof(_aTerminalId)) { // We only support a certain number of channels
     ac[1] = _aTerminalId[(unsigned char)TerminalId];
     pRing = &_SEGGER_RTT.aUp[0];    // Buffer 0 is always reserved for terminal I/O, so we can use index 0 here, fixed
-    SEGGER_RTT_LOCK(SavedState);    // Lock to make sure that no other task is writing into buffer, while we are and number of free bytes in buffer does not change downwards after checking and before writing
+    SEGGER_RTT_LOCK();    // Lock to make sure that no other task is writing into buffer, while we are and number of free bytes in buffer does not change downwards after checking and before writing
     if ((pRing->Flags & SEGGER_RTT_MODE_MASK) == SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL) {
       _ActiveTerminal = TerminalId;
       _WriteBlocking(pRing, ac, 2u);
@@ -998,7 +1095,7 @@ int SEGGER_RTT_SetTerminal (char TerminalId) {
         r = -1;
       }
     }
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
   } else {
     r = -1;
   }
@@ -1023,11 +1120,10 @@ int SEGGER_RTT_SetTerminal (char TerminalId) {
 *
 */
 int SEGGER_RTT_TerminalOut (char TerminalId, const char* s) {
-  int  Status;
-  unsigned  FragLen;
-  unsigned  Avail;
-  SEGGER_RTT_RING_BUFFER *pRing;
-  volatile unsigned SavedState;
+  int                   Status;
+  unsigned              FragLen;
+  unsigned              Avail;
+  SEGGER_RTT_BUFFER_UP* pRing;
   //
   INIT();
   //
@@ -1046,7 +1142,7 @@ int SEGGER_RTT_TerminalOut (char TerminalId, const char* s) {
     //
     // How we output depends upon the mode...
     //
-    SEGGER_RTT_LOCK(SavedState);
+    SEGGER_RTT_LOCK();
     Avail = _GetAvailWriteSpace(pRing);
     switch (pRing->Flags & SEGGER_RTT_MODE_MASK) {
     case SEGGER_RTT_MODE_NO_BLOCK_SKIP:
@@ -1091,7 +1187,7 @@ int SEGGER_RTT_TerminalOut (char TerminalId, const char* s) {
     //
     // Finish up.
     //
-    SEGGER_RTT_UNLOCK(SavedState);
+    SEGGER_RTT_UNLOCK();
   } else {
     Status = -1;
   }
