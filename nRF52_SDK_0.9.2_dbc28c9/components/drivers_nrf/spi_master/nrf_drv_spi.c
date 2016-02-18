@@ -340,6 +340,10 @@ ret_code_t nrf_drv_spi_transfer(nrf_drv_spi_t const * const p_instance,
             // Stop the peripheral after transaction is finished.
             nrf_spim_task_trigger(p_spim, NRF_SPIM_TASK_STOP);
             while (!nrf_spim_event_check(p_spim, NRF_SPIM_EVENT_STOPPED)) {}
+            if (p_cb->ss_pin != NRF_DRV_SPI_PIN_NOT_USED)
+            {
+                nrf_gpio_pin_set(p_cb->ss_pin);
+            }
         }
     )
     CODE_FOR_SPI
@@ -387,6 +391,10 @@ ret_code_t nrf_drv_spi_transfer(nrf_drv_spi_t const * const p_instance,
                 while (!nrf_spi_event_check(p_spi, NRF_SPI_EVENT_READY)) {}
                 nrf_spi_event_clear(p_spi, NRF_SPI_EVENT_READY);
             } while (transfer_byte(p_spi, p_cb));
+            if (p_cb->ss_pin != NRF_DRV_SPI_PIN_NOT_USED)
+            {
+                nrf_gpio_pin_set(p_cb->ss_pin);
+            }
         }
     )
 
